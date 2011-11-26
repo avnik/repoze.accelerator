@@ -185,7 +185,7 @@ class TestAcceleratorPolicy(unittest.TestCase):
         self.assertEqual(storage.url, 'http://example.com')
         self.assertEqual(storage.status, '200 OK')
         self.assertEqual(storage.headers, headers)
-        discrims = storage.discrims
+        discrims = storage.discrims.discriminators
         self.assertEqual(len(discrims), 2)
         self.assertEqual(discrims[0], ('env', ('REQUEST_METHOD', 'GET')))
         self.assertEqual(discrims[1], ('vary', ('cookie', '12345')))
@@ -202,7 +202,7 @@ class TestAcceleratorPolicy(unittest.TestCase):
         self.assertEqual(storage.url, 'http://example.com')
         self.assertEqual(storage.status, '200 OK')
         self.assertEqual(storage.headers, headers)
-        discrims = storage.discrims
+        discrims = storage.discrims.discriminators
         self.assertEqual(len(discrims), 2)
         self.assertEqual(discrims[0], ('env', ('REQUEST_METHOD', 'GET')))
         self.assertEqual(discrims[1], ('vary', ('cookie', '12345')))
@@ -221,7 +221,7 @@ class TestAcceleratorPolicy(unittest.TestCase):
         self.assertEqual(storage.url, 'http://example.com')
         self.assertEqual(storage.status, '200 OK')
         self.assertEqual(storage.headers, headers)
-        discrims = storage.discrims
+        discrims = storage.discrims.discriminators
         self.assertEqual(len(discrims), 3)
         self.assertEqual(discrims[0], ('env', ('REQUEST_METHOD', 'GET')))
         self.assertEqual(discrims[1], ('vary', ('cookie', '12345')))
@@ -248,7 +248,7 @@ class TestAcceleratorPolicy(unittest.TestCase):
         self.assertEqual(storage.url, 'http://example.com')
         self.assertEqual(storage.status, '200 OK')
         self.assertEqual(storage.headers, headers)
-        discrims = storage.discrims
+        discrims = storage.discrims.discriminators
         self.assertEqual(len(discrims), 1)
         self.assertEqual(discrims[0], ('env', ('REMOTE_USER', '12345')))
 
@@ -266,7 +266,7 @@ class TestAcceleratorPolicy(unittest.TestCase):
         self.assertEqual(storage.url, 'http://example.com')
         self.assertEqual(storage.status, '200 OK')
         self.assertEqual(storage.headers, headers)
-        discrims = storage.discrims
+        discrims = storage.discrims.discriminators
         self.assertEqual(len(discrims), 2)
         self.assertEqual(discrims[0], ('env', ('REMOTE_USER', '12345')))
         self.assertEqual(discrims[1], ('vary', ('cookie', '12345')))
@@ -328,11 +328,12 @@ class TestAcceleratorPolicy(unittest.TestCase):
         self.failIfEqual(result, False)
 
     def test_fetch_succeeds_no_request_method(self):
+        from repoze.accelerator.policy import Discriminators
         headers = self._makeHeaders()
         cc = 'max-age=4000'
         headers.append(('Cache-Control', cc))
         import sys
-        expected = ([], sys.maxint, 200, headers, [], {})
+        expected = (Discriminators(), sys.maxint, 200, headers, [], {})
         storage = DummyStorage(fetch_result=[expected])
         policy = self._makeOne(storage)
         environ = self._makeEnviron()
@@ -341,11 +342,12 @@ class TestAcceleratorPolicy(unittest.TestCase):
         self.assertEqual(result, expected[2:-1])
 
     def test_fetch_succeeds_get_request_method(self):
+        from repoze.accelerator.policy import Discriminators
         headers = self._makeHeaders()
         cc = 'max-age=4000'
         headers.append(('Cache-Control', cc))
         import sys
-        expected = ([], sys.maxint, 200, headers, [], {})
+        expected = (Discriminators(), sys.maxint, 200, headers, [], {})
         storage = DummyStorage(fetch_result=[expected])
         policy = self._makeOne(storage)
         environ = self._makeEnviron()
@@ -353,12 +355,13 @@ class TestAcceleratorPolicy(unittest.TestCase):
         self.assertEqual(result, expected[2:-1])
 
     def test_fetch_succeeds_more_than_one_response_from_storage(self):
+        from repoze.accelerator.policy import Discriminators
         headers = self._makeHeaders()
         cc = 'max-age=4000'
         headers.append(('Cache-Control', cc))
         import sys
-        expected1 = ([], sys.maxint, 200, headers, [], {})
-        expected2 = ([], sys.maxint, 200, headers, [], {})
+        expected1 = (Discriminators(), sys.maxint, 200, headers, [], {})
+        expected2 = (Discriminators(), sys.maxint, 200, headers, [], {})
         storage = DummyStorage(fetch_result=[expected1] + [expected2])
         policy = self._makeOne(storage)
         environ = self._makeEnviron()
@@ -366,16 +369,20 @@ class TestAcceleratorPolicy(unittest.TestCase):
         self.assertEqual(result, expected1[2:-1])
 
     def test_fetch_succeeds_via_discrimination(self):
+        from repoze.accelerator.policy import Discriminators
         headers = self._makeHeaders()
         cc = 'max-age=4000'
         headers.append(('Cache-Control', cc))
         import sys
         then = sys.maxint
         stored = [
-            ([('vary', ('Cookie', '12345'))], then, 200, headers, [], {}),
-            ([('vary', ('Cookie', '12345')), ('vary', ('X-Foo', '12345'))],
-             then, 200, headers, [], {}),
-            ([('vary', ('X-Bar', '123'))], then, 200, headers, [], {}),
+            (Discriminators(values=[('vary', ('Cookie', '12345'))]), 
+                then, 200, headers, [], {}),
+            (Discriminators(values=[('vary', ('Cookie', '12345')), 
+                                    ('vary', ('X-Foo', '12345'))]),
+                then, 200, headers, [], {}),
+            (Discriminators(values=[('vary', ('X-Bar', '123'))]),
+                then, 200, headers, [], {}),
             ]
         storage = DummyStorage(fetch_result=stored)
         policy = self._makeOne(storage)
@@ -386,14 +393,18 @@ class TestAcceleratorPolicy(unittest.TestCase):
         self.assertEqual(result, stored[0][2:-1])
 
     def test_fetch_fails_via_discrimination(self):
+        from repoze.accelerator.policy import Discriminators
         headers = self._makeHeaders()
         cc = 'max-age=4000'
         headers.append(('Cache-Control', cc))
         stored = [
-            ([('vary', ('Cookie', '12345'))], 0, 200, headers, [], {}),
-            ([('vary', ('Cookie', '12345')), ('vary', ('X-Foo', '12345'))],
-                  0, 200, headers, [], {}),
-            ([('vary', ('X-Bar', '123'))], 0, 200, headers, [], {}),
+            (Discriminators(values=[('vary', ('Cookie', '12345'))]),
+                0, 200, headers, [], {}),
+            (Discriminators(values=[('vary', ('Cookie', '12345')),
+                                    ('vary', ('X-Foo', '12345'))]),
+                0, 200, headers, [], {}),
+            (Discriminators(values=[('vary', ('X-Bar', '123'))]),
+                0, 200, headers, [], {}),
             ]
         storage = DummyStorage(fetch_result=stored)
         policy = self._makeOne(storage)
@@ -414,10 +425,11 @@ class TestAcceleratorPolicy(unittest.TestCase):
         self.assertEqual(result, None)
 
     def test_fetch_fresh_via_max_age(self):
+        from repoze.accelerator.policy import Discriminators
         headers = self._makeHeaders()
         headers.append(('Cache-Control', 'max-age=4000'))
         import sys
-        expected = ([], sys.maxint, 200, headers, [], {})
+        expected = (Discriminators(), sys.maxint, 200, headers, [], {})
         storage = DummyStorage(fetch_result=[expected])
         policy = self._makeOne(storage)
         environ = self._makeEnviron()
@@ -426,12 +438,13 @@ class TestAcceleratorPolicy(unittest.TestCase):
 
     def test_fetch_fresh_via_expires(self):
         headers = self._makeHeaders()
+        from repoze.accelerator.policy import Discriminators
         from email.Utils import formatdate
         import time
         expires = formatdate(time.time() + 5000)
         headers.append(('Expires', expires))
         import sys
-        expected = ([], sys.maxint, 200, headers, [], {})
+        expected = (Discriminators(), sys.maxint, 200, headers, [], {})
         storage = DummyStorage(fetch_result=[expected])
         policy = self._makeOne(storage)
         environ = self._makeEnviron()
@@ -441,10 +454,11 @@ class TestAcceleratorPolicy(unittest.TestCase):
     def test_fetch_stale_via_max_age(self):
         import time
         from email.Utils import formatdate
+        from repoze.accelerator.policy import Discriminators
         date = formatdate(time.time() - 5000)
         headers = [('Date', date)]
         headers.append(('Cache-Control', 'max-age=10'))
-        expected = ([], 0, 200, headers, [], {})
+        expected = (Discriminators(), 0, 200, headers, [], {})
         storage = DummyStorage(fetch_result=[expected])
         policy = self._makeOne(storage)
         environ = self._makeEnviron()
@@ -455,9 +469,10 @@ class TestAcceleratorPolicy(unittest.TestCase):
         headers = self._makeHeaders()
         import time
         from email.Utils import formatdate
+        from repoze.accelerator.policy import Discriminators
         expires = formatdate(time.time() - 5000)
         headers.append(('Expires', expires))
-        expected = ([], 0, 200, headers, [], {})
+        expected = (Discriminators(), 0, 200, headers, [], {})
         storage = DummyStorage(fetch_result=[expected])
         policy = self._makeOne(storage)
         environ = self._makeEnviron()
@@ -505,3 +520,4 @@ class DummyStorage:
 
     def fetch(self, url):
         return self.fetch_result
+

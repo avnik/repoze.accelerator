@@ -30,6 +30,51 @@ def make_null_policy(logger, storage, config):
     return NullPolicy()
 directlyProvides(make_null_policy, IPolicyFactory)
 
+class Discriminators(object):
+    def __init__(self,
+            request_headers=None,
+            environ=None, 
+            vary_header_names=(),
+            always_vary_on_environ=(),
+            values=None # for test injections only
+            ):
+
+        if values is not None:
+            discriminators = values # testing injection
+        else:
+            discriminators = []
+
+            for header_name in vary_header_names:
+                value = header_value(request_headers, header_name)
+                if value is not None:
+                    discriminators.append(('vary', (header_name, value)))
+
+            for varname in always_vary_on_environ:
+                value = environ.get(varname)
+                if value is not None:
+                    discriminators.append(('env', (varname, value)))
+
+        self.discriminators = tuple(sorted(discriminators))
+
+    def match(self,  request_headers, environ):
+        for discrim in self.discriminators:
+            typ, (stored_name, stored_value) = discrim
+            if typ == 'env':
+                strval = environ.get(stored_name)
+            elif typ == 'vary':
+                strval = header_value(request_headers, stored_name)
+            else:
+                raise ValueError(discrim)
+            if strval is None or strval != stored_value:
+                return False
+        return True
+
+    def __getstate__(self):
+        return self.discriminators
+
+    def __getstaye__(self, values):
+        self.discriminators = values
+
 class AcceleratorPolicy:
     """ Simple accelerating cache policy.
 
@@ -194,17 +239,8 @@ class AcceleratorPolicy:
         if '*' in vary_header_names:
             return
 
-        discriminators = []
-        for header_name in vary_header_names:
-            value = header_value(request_headers, header_name)
-            if value is not None:
-                discriminators.append(('vary', (header_name, value)))
-        for varname in self.always_vary_on_environ:
-            value = environ.get(varname)
-            if value is not None:
-                discriminators.append(('env', (varname, value)))
-
-        discriminators = tuple(sorted(discriminators))
+        discriminators = Discriminators(request_headers, environ, 
+            vary_header_names, self.always_vary_on_environ)
         headers = endtoend(response_headers)
         url = construct_url(environ)
 
@@ -229,26 +265,11 @@ class AcceleratorPolicy:
             )
 
     def _discriminate(self, entries, request_headers, environ):
-
-        matching_entries = entries[:]
-
         for entry in entries:
             discrims, expires, status, headers, body, extras = entry
-            for discrim in discrims:
-                typ, (stored_name, stored_value) = discrim
-                if typ == 'env':
-                    strval = environ.get(stored_name)
-                elif typ == 'vary':
-                    strval = header_value(request_headers, stored_name)
-                else:
-                    raise ValueError(discrim)
-                if strval is None or strval != stored_value:
-                    matching_entries.remove(entry)
-                    break
+            if discrims.match(request_headers, environ):
+                return entry
 
-        if matching_entries:
-            match = matching_entries[0] # this is essentially random
-            return match
 
     def _check_no_cache(self, headers, environ):
         for nocache in ('Pragma', 'Cache-Control'):
