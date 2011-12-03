@@ -1,1 +1,6 @@
 List todo items here.
+
+* Implement Varnish-compatible interface for purge
+* Implement ETag and If-None-Match support
+* Implement If-Modified-Since
+* Implement fcntl-based locking
