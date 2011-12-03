@@ -54,6 +54,9 @@ setup(name='repoze.accelerator',
       entry_points = """\
         [paste.filter_app_factory]
         accelerator = repoze.accelerator.middleware:main
+
+        [repoze.accelerator]
+        disk = repoze.accelerator.storage:make_disk_storage
       """
       )
 
