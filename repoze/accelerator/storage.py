@@ -37,11 +37,9 @@ class MemoryStorage:
     def fetch(self, url):
         entries = self.data.get(url)
         if entries is None:
-            return None
-        L = []
+            return
         for discrims, (expires,status,headers,body,extras) in entries.items():
-            L.append((discrims, expires, status, headers, body, extras))
-        return L
+            yield (discrims, expires, status, headers, body, extras)
 
 def make_memory_storage(logger, config):
     return MemoryStorage(logger)

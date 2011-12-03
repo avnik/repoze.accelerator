@@ -65,7 +65,7 @@ class IStorage(Interface):
     """ Reqired API of plugins which manage the cache's backing store.
     """
     def fetch(url):
-        """ Return a sequence of entries from the backing store for
+        """ Return a generator of entries from the backing store for
         the given 'url'.  Each entry is in the form
         (discriminators, expires, status, headers, body_iter, extras).
 

@@ -63,7 +63,7 @@ class TestMemoryStorage(unittest.TestCase):
     def test_fetch_nonexistent(self):
         lock = DummyLock()
         storage = self._makeOne(lock)
-        self.assertEqual(storage.fetch('url'), None)
+        self.assertEqual(len(list(storage.fetch('url'))), 0)
 
     def test_fetch_existing(self):
         lock = DummyLock()
@@ -72,7 +72,7 @@ class TestMemoryStorage(unittest.TestCase):
             ('env', (1, 2)):(0, 200, [], [], {}),
             ('env', (3, 4)):(0, 203, [], [], {}),
             }
-        result = storage.fetch('url')
+        result = list(storage.fetch('url'))
         result.sort()
         self.assertEqual(len(result), 2)
         self.assertEqual(
